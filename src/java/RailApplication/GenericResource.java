@@ -33,11 +33,13 @@ public class GenericResource {
 
     ResultSet rs1 = null;
     ResultSet rs2 = null;
+    ResultSet rs3 = null;
     Connection conn = null;
     Statement stm = null;
     Statement stm2 = null;
+    Statement stm3 = null;
     ResultSet rs = null;
-    String sql ,sql2;
+    String sql, sql2, sql3;
    
     @Context
     private UriInfo context;
@@ -142,25 +144,27 @@ public class GenericResource {
             scheduleObj.accumulate("depart_time",depart_time );
         
             sql2 = "SELECT * FROM ROUTES WHERE TRAIN_ID = '"+ train_id +"'";
-//            stm2 = conn.createStatement();
-//            rs2 = stm2.executeQuery(sql2);
-//            
-//            while(rs2.next()){
-//            route_id =rs.getInt("ROUTE_ID");
-//            source = rs.getString("SOURCE");
-//            destination = rs.getString("DESTINATION");
-//            date_of_route =rs.getString("DATE_OF_ROUTE");
-//            
-//           routeObj.accumulate("ROUTE_ID", route_id);
-//           routeObj.accumulate("SOURCE", source);
-//           routeObj.accumulate("DESTINATION", destination);
-//           routeObj.accumulate("DATE_OF_ROUTE", date_of_route);
-//           
-//            routeArr.add(routeObj);
-//            routeObj.clear();
-//            }
-//           scheduleObj.accumulate("Routes",routeArr);
+            stm2 = conn.createStatement();
+            rs2 = stm2.executeQuery(sql2);
+            
+            while(rs2.next()){
+            route_id =rs2.getInt("ROUTE_ID");
+            source = rs2.getString("SOURCE");
+            destination = rs2.getString("DESTINATION");
+            date_of_route =rs2.getString("DATE_OF_ROUTE");
+            
+           routeObj.accumulate("ROUTE_ID", route_id);
+           routeObj.accumulate("SOURCE", source);
+           routeObj.accumulate("DESTINATION", destination);
+           routeObj.accumulate("DATE_OF_ROUTE", date_of_route);
            
+            routeArr.add(routeObj);
+            routeObj.clear();
+            }
+            if(!routeArr.isEmpty()){
+                scheduleObj.accumulate("Routes",routeArr);
+                routeArr.clear();
+            }
             scheduleArr.add(scheduleObj);
             scheduleObj.clear();
             }
@@ -169,7 +173,109 @@ public class GenericResource {
              System.out.print(e);
           }
           }else{
-           mainObj.accumulate("stats", "error");
+            mainObj.accumulate("status", "error");
+           mainObj.accumulate("TimeStamp", System.currentTimeMillis() / 1000);
+           mainObj.accumulate("message", "Something went wrong!! No Schedule Data found");
+                     
+          } 
+          return mainObj.toString();
+    }
+    
+    @GET
+    @Path("viewCorrespondingStations&{train_id}")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String viewCorrespondingStations(@PathParam("train_id") int train_id) {
+        
+        
+        JSONObject mainObj = new JSONObject();
+        JSONArray stationArr = new JSONArray();
+        JSONObject stationObj = new JSONObject();
+        JSONArray routeArr = new JSONArray();
+        JSONObject routeObj = new JSONObject();
+        
+        String train_name ,train_type ,arrival_time ,depart_time,source ,destination ,date_of_route,station_name;
+        int route_id,station_id;
+        double contact_number;
+        
+        conn = getConnection();
+       
+        sql = "SELECT TRAIN_ID,TRAIN_NAME,TRAIN_TYPE,ARRIVAL_TIME,DEPART_TIME FROM TRAINS WHERE TRAIN_ID = '"+ train_id +"'";
+        
+          if(conn != null){
+          
+           try {
+              
+            stm = conn.createStatement();
+            rs = stm.executeQuery(sql);
+           
+            mainObj.accumulate("status", "ok");
+            mainObj.accumulate("TimeStamp", System.currentTimeMillis() / 1000);
+            
+            while(rs.next()){
+            train_id = rs.getInt("TRAIN_ID");
+            train_name = rs.getString("TRAIN_NAME");
+            train_type = rs.getString("TRAIN_TYPE");
+            arrival_time = rs.getString("ARRIVAL_TIME");
+            depart_time = rs.getString("DEPART_TIME");
+            
+            mainObj.accumulate("train_id",train_id);
+            mainObj.accumulate("train_name",train_name);
+            mainObj.accumulate("train_type",train_type );
+            mainObj.accumulate("arrival_time",arrival_time );
+            mainObj.accumulate("depart_time",depart_time );
+        
+            sql2 = "SELECT * FROM ROUTES WHERE TRAIN_ID = '"+ train_id +"'";
+            stm2 = conn.createStatement();
+            rs2 = stm2.executeQuery(sql2);
+            
+            while(rs2.next()){
+            route_id =rs2.getInt("ROUTE_ID");
+            source = rs2.getString("SOURCE");
+            destination = rs2.getString("DESTINATION");
+            date_of_route =rs2.getString("DATE_OF_ROUTE");
+            
+            routeObj.accumulate("ROUTE_ID", route_id);
+            routeObj.accumulate("SOURCE", source);
+            routeObj.accumulate("DESTINATION", destination);
+            routeObj.accumulate("DATE_OF_ROUTE", date_of_route);
+            
+            sql3 = "SELECT STATIONS.STATION_ID,STATION_NAME,CONTACT_NUMBER FROM STATIONS,STATION_ROUTE,ROUTES WHERE ROUTES.ROUTE_ID = STATION_ROUTE.ROUTE_ID AND STATIONS.STATION_ID = STATION_ROUTE.STATION_ID AND ROUTES.ROUTE_ID = '"+ route_id +"'";
+                    
+            stm3 = conn.createStatement();
+            rs3 = stm3.executeQuery(sql3);
+            
+            while(rs3.next()){
+                
+                station_id = rs3.getInt("STATION_ID");
+                station_name = rs3.getString("STATION_NAME");
+                contact_number = rs3.getDouble("CONTACT_NUMBER");
+                
+                stationObj.accumulate("Station_id", station_id);
+                stationObj.accumulate("Station_name", station_name);
+                stationObj.accumulate("Contact_number", contact_number);
+                
+                stationArr.add(stationObj);
+                stationObj.clear();
+            }
+            routeObj.accumulate("Corresponding_stations", stationArr);
+            stationArr.clear();
+            routeArr.add(routeObj);
+            routeObj.clear();
+            }
+            if(!routeArr.isEmpty()){
+                mainObj.accumulate("Routes",routeArr);
+                routeArr.clear();
+            }
+            
+            }
+            
+            } catch(Exception e){
+             System.out.print(e);
+          }
+          }else{
+           mainObj.accumulate("status", "error");
+           mainObj.accumulate("TimeStamp", System.currentTimeMillis() / 1000);
+           mainObj.accumulate("message", "Something went wrong!! No Corresponding Data found");
           
           } 
           return mainObj.toString();
@@ -219,16 +325,16 @@ public class GenericResource {
 
 
     @GET
-    @Path("registerTrain&{train_id}&{train_name}&{number_of_coaches}&{train_type}&{arrival_time}&{depart_time}")
+    @Path("registerTrain&{train_name}&{number_of_coaches}&{train_type}&{arrival_time}&{depart_time}")
     @Produces(MediaType.TEXT_PLAIN)
-    public String registerTrain(@PathParam("train_id") int train_Id, @PathParam("train_name") String train_Name , @PathParam("number_of_coaches") int number_of_coaches ,@PathParam("train_type") String train_Type , @PathParam("arrival_time") String arrival_Time ,@PathParam("depart_time") String depart_Time) {
+    public String registerTrain(@PathParam("train_name") String train_Name , @PathParam("number_of_coaches") int number_of_coaches ,@PathParam("train_type") String train_Type , @PathParam("arrival_time") String arrival_Time ,@PathParam("depart_time") String depart_Time) {
 
         conn = getConnection();
         JSONObject regTrainObj = new JSONObject();
                 
                 
         if (conn != null) {
-            String sql = "insert into TRAINS(train_id , train_name , number_of_coaches ,train_type, arrival_time , depart_time) values('" + train_Id + "','" + train_Name + "' ,'" + number_of_coaches + "' ,'" + train_Type + "','" + arrival_Time + "','" + depart_Time + "') ";
+            String sql = "insert into TRAINS(train_id , train_name , number_of_coaches ,train_type, arrival_time , depart_time) values(AutoNumber.NEXTVAL,'" + train_Name + "' ,'" + number_of_coaches + "' ,'" + train_Type + "','" + arrival_Time + "','" + depart_Time + "') ";
              
           
             try {
